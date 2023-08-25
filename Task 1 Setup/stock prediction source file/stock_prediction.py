@@ -23,11 +23,14 @@ import pandas_datareader as web
 import datetime as dt
 import tensorflow as tf
 import yfinance as yf
-
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow import keras
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, LSTM, InputLayer
+import os
+import pickle
+import joblib
 
 #------------------------------------------------------------------------------
 # Load Data
@@ -35,16 +38,40 @@ from keras.layers import Dense, Dropout, LSTM, InputLayer
 # 1) Check if data has been saved before. 
 # If so, load the saved data
 # If not, save the data into a directory
+
 #------------------------------------------------------------------------------
 DATA_SOURCE = "yahoo"
 COMPANY = "TSLA"
+split_by_date = True  # Set to False for random splitting
+test_size = 0.8
+
+
+# Load or download data
+if os.path.exists("stock_data.pkl"):
+    with open("stock_data.pkl", "rb") as f:
+        data = pickle.load(f)
+else:
+    # Changed the date from original and set to take User inputs.
+    TRAIN_START = input("Enter a start date in the format YYYY-MM-DD: \n")
+    TRAIN_END = input("Enter an end date in the format YYYY-MM-DD: \n")
+
+    data =  yf.download(COMPANY, start=TRAIN_START, end=TRAIN_END, progress=False)
+    data.dropna(inplace=True)
+    
+    with open("stock_data.pkl", "wb") as f:
+        pickle.dump(data, f)
+print(data)
+# Test data ratio
 
 # start = '2012-01-01', end='2017-01-01'
-TRAIN_START = '2015-01-01'
-TRAIN_END = '2020-01-01'
 
-data =  yf.download(COMPANY, start=TRAIN_START, end=TRAIN_END, progress=False)
+# Changed the date from original and set to take User inputs.
+TRAIN_START = input("Enter a start date in the format YYYY-MM-DD: \n")
+TRAIN_END = input("Enter an end date in the format YYYY-MM-DD: \n")
+
+
 # yf.download(COMPANY, start = TRAIN_START, end=TRAIN_END)
+
 
 # For more details: 
 # https://pandas.pydata.org/pandas-docs/stable/user_guide/dsintro.html
@@ -63,6 +90,10 @@ scaler = MinMaxScaler(feature_range=(0, 1))
 # Note that, by default, feature_range=(0, 1). Thus, if you want a different 
 # feature_range (min,max) then you'll need to specify it here
 scaled_data = scaler.fit_transform(data[PRICE_VALUE].values.reshape(-1, 1)) 
+scaler_filename = "scaler.save"
+joblib.dump = (scaler, scaler_filename)
+# To Load it: scaler = joblib.load(scaler_filename)
+
 # Flatten and normalise the data
 # First, we reshape a 1D array(n) to 2D array(n,1)
 # We have to do that because sklearn.preprocessing.fit_transform()
@@ -276,3 +307,18 @@ print(f"Prediction: {prediction}")
 # the stock price:
 # https://github.com/jason887/Using-Deep-Learning-Neural-Networks-and-Candlestick-Chart-Representation-to-Predict-Stock-Market
 # Can you combine these different techniques for a better prediction??
+# Add the following section for data splitting flexibility
+
+if split_by_date:
+    # Split data by date
+    train_samples = int((1 - test_size) * len(x_train))
+    x_train_final = x_train[:train_samples]
+    y_train_final = y_train[:train_samples]
+    x_test_final = x_train[train_samples:]
+    y_test_final = y_train[train_samples:]
+else:
+    # Split data randomly
+    from sklearn.model_selection import train_test_split
+    x_train_final, x_test_final, y_train_final, y_test_final = train_test_split(
+        x_train, y_train, test_size=test_size, shuffle=True
+    )
