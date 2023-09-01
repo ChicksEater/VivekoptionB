@@ -33,7 +33,7 @@ import pickle
 import joblib
 import mplfinance as fplt
 import plotly.graph_objects as go
-
+import plotly.express as px
 #------------------------------------------------------------------------------
 # Load Data
 ## TO DO:
@@ -291,7 +291,7 @@ fplt.plot(
             title='TSLA, CandleStickChart',
             ylabel='Price ($)'
         )
-# Values for Individual Candlesticks
+# Values for Individual Candlesticks or n trading days
 candlestick = go.Candlestick(
                             x=tsla_df.index,
                             open=tsla_df['Open'],
@@ -310,15 +310,35 @@ fig.update_layout(
 
 fig.show()
 # Making the boxplot Chart
-data_to_boxplot = [tsla_df['Open'], tsla_df['Close'], tsla_df['Low'], tsla_df['High']]
-labels = ['Open', 'Close', 'Low', 'High']
 
-plt.figure(figsize=(10, 6))
-plt.boxplot(data_to_boxplot, labels=labels)
-plt.title('TSLA Stock Price Boxplot')
-plt.ylabel('Price ($)')
-plt.show()
+# Load data from CSV file into a DataFrame
+csv_file_path = 'stock_data.csv'  
+df = pd.read_csv(csv_file_path)
 
+df['Date'] = pd.to_datetime(df['Date'])  # Convert 'Date' column to datetime
+df.sort_values(by='Date', inplace=True)
+df.reset_index(drop=True, inplace=True)
+
+# Slice the last 30 days of data
+last_30_days_data = df.tail(30)
+
+# Save the sliced data to a new CSV file
+output_csv_path = "30daysdata.csv"  
+last_30_days_data.to_csv(output_csv_path, index=False)
+
+# Set the company name and rolling window
+company_name = "TSLA"
+rolling_days = 30  # Adjust this value as needed
+df = pd.read_csv(output_csv_path)
+# Create the figure using Plotly Express
+fig = px.box(df,
+             x='Date',  # Assuming 'Date' is the column name for dates
+             y=['High', 'Low', 'Close', 'Open'],
+             title=f"{company_name} Prices Boxed over {rolling_days} Day Window",
+             labels={'x': 'Dates', 'y': 'Price ($)'})
+
+# Display the figure
+fig.show()
 #------------------------------------------------------------------------------
 # Predict next day
 #------------------------------------------------------------------------------
