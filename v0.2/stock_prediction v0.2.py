@@ -27,7 +27,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow import keras
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, LSTM, InputLayer
+from keras.layers import Dense, Dropout, LSTM, InputLayer, Bidirectional, GRU
 import os
 import pickle
 import joblib
@@ -145,57 +145,157 @@ x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
 # If not, save the data into a directory
 # 2) Change the model to increase accuracy?
 #------------------------------------------------------------------------------
-model = Sequential() # Basic neural network
-# See: https://www.tensorflow.org/api_docs/python/tf/keras/Sequential
-# for some useful examples
+# model = Sequential() # Basic neural network
+# # See: https://www.tensorflow.org/api_docs/python/tf/keras/Sequential
+# # for some useful examples
 
-model.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1], 1)))
-# This is our first hidden layer which also spcifies an input layer. 
-# That's why we specify the input shape for this layer; 
-# i.e. the format of each training example
-# The above would be equivalent to the following two lines of code:
-# model.add(InputLayer(input_shape=(x_train.shape[1], 1)))
+
+
+
+# Define the parameters for the model
+
+
+sequence_length = int(input('Enter the number of sequence length(for example 60): \n'))  # Length of input sequences
+n_features = int(input ('Enter the value of the input layers(for example 1): \n')) # Number of input features (e.g., for univariate time series data)
+units = int(input('Enter the name of the LSTM Units in each layer(For example 64):\n'))  # Number of LSTM units in each layer
+n_layers = int(input('Enter the number of LSTM Layers(for example 2): \n' ))  # Number of LSTM layers
+dropout = float(input('Enter the drpoout rate (for example 0.6): \n '))  # Dropout rate
+loss = "mean_absolute_error"  # Loss function
+optimizer = "rmsprop"  # Optimizer
+bidirectional = True  # Whether to use bidirectional LSTM layers
+
+# Create the deep learning model
+
+select = int(input("Press 1 for LSTM Model and press 2 for GRU Model:"))
+
+def create_gru_model(sequence_length, n_features, units=64, n_layers=2, dropout=0.3,
+                                loss="mean_absolute_error", optimizer="rmsprop", bidirectional=False):
+            model = Sequential()
+
+            for i in range(n_layers):
+                if i == 0:
+                    # First layer
+                    if bidirectional:
+                        model.add(Bidirectional(GRU(units, return_sequences=True), batch_input_shape=(None, sequence_length, n_features)))
+                    else:
+                        model.add(GRU(units, return_sequences=True, batch_input_shape=(None, sequence_length, n_features)))
+                elif i == n_layers - 1:
+                    # Last layer
+                    if bidirectional:
+                        model.add(Bidirectional(GRU(units, return_sequences=False)))
+                    else:
+                        model.add(GRU(units, return_sequences=False))
+                else:
+                    # Hidden layers
+                    if bidirectional:
+                        model.add(Bidirectional(GRU(units, return_sequences=True)))
+                    else:
+                        model.add(GRU(units, return_sequences=True))
+
+                # Add dropout after each layer
+                model.add(Dropout(dropout))
+
+            # Output layer
+            model.add(Dense(1, activation="linear"))
+
+            # Compile the model
+            model.compile(loss=loss, metrics=["mean_absolute_error"], optimizer=optimizer)
+            # Print a summary of the model's architecture
+            model.summary()
+            return model
+
+if select==1:
+
+    model = Sequential()
+
+    for i in range(n_layers):
+        if i == 0:
+            # First layer
+            if bidirectional:
+                model.add(Bidirectional(LSTM(units, return_sequences=True), batch_input_shape=(None, sequence_length, n_features)))
+            else:
+                model.add(LSTM(units, return_sequences=True, batch_input_shape=(None, sequence_length, n_features)))
+        elif i == n_layers - 1:
+            # Last layer
+            if bidirectional:
+                model.add(Bidirectional(LSTM(units, return_sequences=False)))
+            else:
+                model.add(LSTM(units, return_sequences=False))
+        else:
+            # Hidden layers
+            if bidirectional:
+                model.add(Bidirectional(LSTM(units, return_sequences=True)))
+            else:
+                model.add(LSTM(units, return_sequences=True))
+        
+        # Add dropout after each layer
+        model.add(Dropout(dropout))
+
+# Output layer
+        model.add(Dense(1, activation="linear"))
+
+        # Compile the model
+        model.compile(loss=loss, metrics=["mean_absolute_error"], optimizer=optimizer)
+
+        # Print a summary of the model's architecture
+        model.summary()
+elif select==2 :
+    model = create_gru_model(sequence_length, n_features, units=64, n_layers=2, dropout=0.3,
+                                loss="mean_absolute_error", optimizer="rmsprop", bidirectional=False)
+else:
+    print("Invalid selection. Please choose 1 for LSTM or 2 for GRU.")
+    exit()
+
+
+
+
+# model.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1], 1)))
+# # This is our first hidden layer which also spcifies an input layer. 
+# # That's why we specify the input shape for this layer; 
+# # i.e. the format of each training example
+# # The above would be equivalent to the following two lines of code:
+# # model.add(InputLayer(input_shape=(x_train.shape[1], 1)))
+# # model.add(LSTM(units=50, return_sequences=True))
+# # For som eadvances explanation of return_sequences:
+# # https://machinelearningmastery.com/return-sequences-and-return-states-for-lstms-in-keras/
+# # https://www.dlology.com/blog/how-to-use-return_state-or-return_sequences-in-keras/
+# # As explained there, for a stacked LSTM, you must set return_sequences=True 
+# # when stacking LSTM layers so that the next LSTM layer has a 
+# # three-dimensional sequence input. 
+
+# # Finally, units specifies the number of nodes in this layer.
+# # This is one of the parameters you want to play with to see what number
+# # of units will give you better prediction quality (for your problem)
+
+# model.add(Dropout(0.2))
+# # The Dropout layer randomly sets input units to 0 with a frequency of 
+# # rate (= 0.2 above) at each step during training time, which helps 
+# # prevent overfitting (one of the major problems of ML). 
+
 # model.add(LSTM(units=50, return_sequences=True))
-# For som eadvances explanation of return_sequences:
-# https://machinelearningmastery.com/return-sequences-and-return-states-for-lstms-in-keras/
-# https://www.dlology.com/blog/how-to-use-return_state-or-return_sequences-in-keras/
-# As explained there, for a stacked LSTM, you must set return_sequences=True 
-# when stacking LSTM layers so that the next LSTM layer has a 
-# three-dimensional sequence input. 
+# # More on Stacked LSTM:
+# # https://machinelearningmastery.com/stacked-long-short-term-memory-networks/
 
-# Finally, units specifies the number of nodes in this layer.
-# This is one of the parameters you want to play with to see what number
-# of units will give you better prediction quality (for your problem)
+# model.add(Dropout(0.2))
+# model.add(LSTM(units=50))
+# model.add(Dropout(0.2))
 
-model.add(Dropout(0.2))
-# The Dropout layer randomly sets input units to 0 with a frequency of 
-# rate (= 0.2 above) at each step during training time, which helps 
-# prevent overfitting (one of the major problems of ML). 
+# model.add(Dense(units=1)) 
+# # Prediction of the next closing value of the stock price
 
-model.add(LSTM(units=50, return_sequences=True))
-# More on Stacked LSTM:
-# https://machinelearningmastery.com/stacked-long-short-term-memory-networks/
+# # We compile the model by specify the parameters for the model
+# # See lecture Week 6 (COS30018)
+# model.compile(optimizer='adam', loss='mean_squared_error')
+# # The optimizer and loss are two important parameters when building an 
+# # ANN model. Choosing a different optimizer/loss can affect the prediction
+# # quality significantly. You should try other settings to learn; e.g.
 
-model.add(Dropout(0.2))
-model.add(LSTM(units=50))
-model.add(Dropout(0.2))
+# # optimizer='rmsprop'/'sgd'/'adadelta'/...
+# # loss='mean_absolute_error'/'huber_loss'/'cosine_similarity'/...
 
-model.add(Dense(units=1)) 
-# Prediction of the next closing value of the stock price
-
-# We compile the model by specify the parameters for the model
-# See lecture Week 6 (COS30018)
-model.compile(optimizer='adam', loss='mean_squared_error')
-# The optimizer and loss are two important parameters when building an 
-# ANN model. Choosing a different optimizer/loss can affect the prediction
-# quality significantly. You should try other settings to learn; e.g.
-    
-# optimizer='rmsprop'/'sgd'/'adadelta'/...
-# loss='mean_absolute_error'/'huber_loss'/'cosine_similarity'/...
-
-# Now we are going to train this model with our training data 
-# (x_train, y_train)
-model.fit(x_train, y_train, epochs=25, batch_size=32)
+# # Now we are going to train this model with our training data 
+# # (x_train, y_train)
+# model.fit(x_train, y_train, epochs=25, batch_size=32)
 # Other parameters to consider: How many rounds(epochs) are we going to 
 # train our model? Typically, the more the better, but be careful about
 # overfitting!
